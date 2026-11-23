@@ -1,75 +1,79 @@
-import json
+from newspaper import Issue
 
-def get_paper_structure() -> dict[dict[str:list]]:
-    """Returns JSON file with the structure of the Kommersant newspaper"""
+issue = Issue("structure.json")
 
-    with open("structure.json", "r", encoding="utf-8") as file:
-            structure = json.load(file)
+# import json
 
-    return structure
+# def get_paper_structure() -> dict[dict[str:list]]:
+#     """Returns JSON file with the structure of the Kommersant newspaper"""
 
-def count_rubric_occurences(structure: dict[dict[str:list]]) -> dict[str:int]:
-    """Counts how many times each rubric occurs within the entire paper"""
+#     with open("structure.json", "r", encoding="utf-8") as file:
+#             structure = json.load(file)
 
-    pages: dict[list]  # keys are page numbers, values are rubrics lists
-    rubrics_count: dict[str: int] = {}  # result
+#     return structure
 
-    for page in structure.values():
+# def count_rubric_occurences(structure: dict[dict[str:list]]) -> dict[str:int]:
+#     """Counts how many times each rubric occurs within the entire paper"""
+
+#     pages: dict[list]  # keys are page numbers, values are rubrics lists
+#     rubrics_count: dict[str: int] = {}  # result
+
+#     for page in structure.values():
         
-        rubrics: list
+#         rubrics: list
 
-        for rubrics in page.values():
+#         for rubrics in page.values():
 
-            for rubric in rubrics:
-                if rubric in rubrics_count:
-                    rubrics_count[rubric] += 1
-                else:
-                    rubrics_count[rubric] = 1
+#             for rubric in rubrics:
+#                 if rubric in rubrics_count:
+#                     rubrics_count[rubric] += 1
+#                 else:
+#                     rubrics_count[rubric] = 1
 
-    return rubrics_count
+#     return rubrics_count
 
-def get_wandering_rubrics(rubric_occurences: dict):
-    """Returns only those rubrics that wander from page to page"""
-    wandering_rubrics = []
-    for rubric, count in rubric_occurences.items():
-        if count > 1:
-            wandering_rubrics.append(rubric)
-    print(f"Wandering_rubrics: {wandering_rubrics}")
-    return wandering_rubrics
+# def get_wandering_rubrics(rubric_occurences: dict):
+#     """Returns only those rubrics that wander from page to page"""
+#     wandering_rubrics = []
+#     for rubric, count in rubric_occurences.items():
+#         if count > 1:
+#             wandering_rubrics.append(rubric)
+#     print(f"Wandering_rubrics: {wandering_rubrics}")
+#     return wandering_rubrics
 
-def update_sctructure_exluding_wandering_rubrics(
-        structure: dict[dict[str:list]],
-        wandering_rubrics: list[str]
-) -> dict[dict[str:list]]:
-    """Returns new dictionary that reflects paper structure with exluded wandering rubrics"""
+# def update_sctructure_exluding_wandering_rubrics(
+#         structure: dict[dict[str:list]],
+#         wandering_rubrics: list[str]
+# ) -> dict[dict[str:list]]:
+#     """Returns new dictionary that reflects paper structure with exluded wandering rubrics"""
 
-    updated_structure: dict[dict[str:list]] = {}
+#     updated_structure: dict[dict[str:list]] = {}
 
-    for theme, pages in structure.items():
-        updated_structure.setdefault(theme, {})
+#     for theme, pages in structure.items():
+#         updated_structure.setdefault(theme, {})
 
-        for page, rubrics in pages.items():
-            updated_structure[theme].setdefault(page, [])
+#         for page, rubrics in pages.items():
+#             updated_structure[theme].setdefault(page, [])
 
-            for rubric in rubrics:
-                if rubric in wandering_rubrics:
-                    continue
+#             for rubric in rubrics:
+#                 if rubric in wandering_rubrics:
+#                     continue
 
-                updated_structure[theme][page].append(rubric)
+#                 updated_structure[theme][page].append(rubric)
 
-    return updated_structure
+#     return updated_structure
 
-def write_new_structure(new_structure):
-    """Writes new structure into new JSON"""
+# def write_new_structure(new_structure):
+#     """Writes new structure into new JSON"""
 
-    with open("new_structure.json", "w", encoding="utf-8") as file:
-        json.dump(new_structure, file, ensure_ascii=False, indent=4)
+#     with open("new_structure.json", "w", encoding="utf-8") as file:
+#         json.dump(new_structure, file, ensure_ascii=False, indent=4)
 
 
-if __name__ == "__main__":
-    structure = get_paper_structure()
-    rubric_occurences = count_rubric_occurences(structure)
-    wandering_rubrics = get_wandering_rubrics(rubric_occurences)
-    new_structure = update_sctructure_exluding_wandering_rubrics(structure, wandering_rubrics)
+# if __name__ == "__main__":
+#     structure = get_paper_structure()
+#     rubric_occurences = count_rubric_occurences(structure)
+#     wandering_rubrics = get_wandering_rubrics(rubric_occurences)
+#     new_structure = update_sctructure_exluding_wandering_rubrics(structure, wandering_rubrics)
 
-    write_new_structure(new_structure)
+#     write_new_structure(new_structure)
