@@ -1,21 +1,24 @@
 from json import load
+from copy import deepcopy
 
 class Article:
     """Represents a newspaper article"""
+    # Links to parent objects
     parent_issue: Issue  # link to an Issue object, which represents a singular issue of the newspaper
     parent_section: Section  # link to a Section object, which represents a large thematic section of the newspaper, such as "News", "Culture" etc
     parent_page: Page  # link to a Page object, which represents a singular page of the newspaper Issue
 
+    # Local data
     rubric: str  # name of a rubric, which this article belongs to
     volume: int  # amount of symbols in the article.
     heading: str  # article's heading
     author: None|str  # article's author
-    is_column: True|False  # whether the article is an author's column or not
+    is_column: bool  # whether the article is an author's column or not
 
-    def __init__(self, issue, section, page, rubric, volume, heading, author=None, is_column=False):
-        self.parent_issue = issue
-        self.parent_section = section
-        self.parent_page = page
+    def __init__(self, parent_issue, parent_section, parent_page, rubric, volume=None, heading=None, author=None, is_column=None):
+        self.parent_issue = parent_issue
+        self.parent_section = parent_section
+        self.parent_page = parent_page
 
         self.rubric = rubric
 
@@ -24,17 +27,22 @@ class Article:
         author = author
         is_column = is_column
 
+    def __repr__(self):   
+        representative_data = self.heading
+        if self.heading is None:
+            representative_data = self.rubric
+        return f'Article({representative_data})'
+
 
 class Page:
     """Represents a page of a newspaper issue"""
+
     # Links to parent objects
     parent_issue: Issue
     parent_thematic_section: Section
 
-    # Private data
-    page_number: int
-
-    # Contains
+    # Local data
+    number: int
     articles_on_page: list[Article]
 
     def __init__(self, parent_issue: Issue, parent_thematic_section: Section, page_number: int, articles_on_page: list[Article]):
@@ -42,120 +50,203 @@ class Page:
         self.parent_thematic_section = parent_thematic_section
 
         self.number = int(page_number)
-        self.articles_on_page = articles_on_page
 
-    def __str__(self):
-        return str(f"Страница {self.number}")
+        # Defining articles on page
+        self.articles_on_page = []
+        for rubric in articles_on_page:
+            self.articles_on_page.append(Article(parent_issue, parent_thematic_section, self, rubric=rubric))
 
     def __repr__(self):
         return f"Page({self.number})"
 
+    def __getitem__(self, article_index):
+        return self.articles_on_page[article_index]
+
+    def get_article(self, article_index: int = None):
+        if article_index is None:
+            return self.articles_on_page
+        return self.articles_on_page[article_index]
+
+
 class Section:
+    # Links to parent objects
     parent_issue: Issue
 
+    # Local data
     name: str
-    pages = list[Page]
+    pages_in_section = list[Page] | list
 
-    def __init__(self, parent_issue: Issue, name: str, pages: list[Page] = None):
+    def __init__(self, parent_issue: Issue, name: str, pages_in_section: list[Page] | list):
         self.parent_issue = parent_issue
         self.name = name
-        if pages is None:
-            self.pages = []
-        else:
-            self.pages = pages
+
+        if pages_in_section:
+            # Adding pages to section
+            self.pages_in_section = []
+            for page_number, articles_on_page in pages_in_section:
+                self.pages_in_section.append(Page(parent_issue, self, page_number, articles_on_page))
 
     def append(self, page: Page):
         self.pages.append(page)
 
     def __str__(self):
-        return f"Section({self.name}, {self.pages})"
+        return f"Section({self.name}, {self.pages_in_section})"
 
     def __repr__(self):
-        return f"Section({self.name}, {self.pages})"
+        return f'Section("{self.name}")'
 
-    def __getitem__(self, key: int):
-        for page in self.pages:
-            if page.number == key:
-                return page
+    def __getitem__(self, page_index: int = None):
+        if page_index is None:
+            return self.pages_in_section
+        elif isinstance(page_index, int):
+            return self.pages_in_section[page_index]
+        raise TypeError("Page index must be int")
 
     def __iter__(self):
-        return iter(self.pages)
+        return iter(self.pages_in_section)
+
+    def get_page(self, page_number: int = None) -> Page:
+        if page_number is None:
+            return self.pages_in_section
+        elif isinstance(page_number, int):
+            for page in self.pages_in_section:
+                if page.number == page_number:
+                    return page
+        raise KeyError("No page with this number. Might try search with index via page[index: int]")
 
 class Issue:
-    filename: str
-    thematic_sections: list[Section[Page]]
+    _source_file_name: str | None
+    _sections: list[Section[Page]] | list
 
-    def __init__(self, filename: str):
-        # Saving source filename
-        self.filename = filename
+    def __init__(self, source_file_name: str = None):
+        self._sections = []
+        self._source_file_name = source_file_name
+        
+        if source_file_name is not None:
+            # Loading data from JSON
+            issue_data: dict[str:dict[str:list]] = self.from_json(self._source_file_name)
 
-        # Loading data from JSON
-        issue_data = self.load_issue_data_from_json()
+            # Defining child thematic section
+            for section_name, pages_in_section in issue_data.items():
+                self._sections.append(Section(self, section_name, pages_in_section))
 
-        # Defining thematic sections
-        self.thematic_sections = []
-        for thematic_section_name, pages in issue_data.items():
-            thematic_section = Section(parent_issue=self, name=thematic_section_name)
+    def from_json(self, filename) -> dict[str:dict[str:list]]:
+        with open(filename, "r", encoding="utf-8") as file:
+            issue_data = load(file)
 
-            # Defining pages
-            for page_number, rubrics in pages.items():
-                page = Page(
-                    parent_issue=self
-                    parent_thematic_section=thematic_section, 
-                    page_number=page_number,
-                    articles_on_page=...
-                )
+        return issue_data
 
-                thematic_section.append(page)
+    def append_article(self, article: Article):
+        if article.parent_section not in self._sections:  
+            self._sections.append(article.parent_section)
 
-            self.thematic_sections.append(thematic_section)
+    def append_section(self, section: Section):
+        self._sections.append(section)
 
     def __repr__(self):
-        return f"Issue({self.filename})"
+        if self._source_file_name is not None:
+            return f'Issue("{self._source_file_name}")'
+        return f'Issue({self._sections})'
 
     def __getitem__(self, key: str|int) -> Section|Page: 
         if isinstance(key, str):
-            for section in self.thematic_sections:
+            for section in self._sections:
                 if section.name == key: 
                     return section
-            raise KeyError
+            raise KeyError("There is no sections with such name")
+        
         elif isinstance(key, int):
-            for section in self.thematic_sections:
+            for section in self._sections:
                 for page in section:
                     if page.number == key:
                         return page
-        raise TypeError
+            raise KeyError("There is no section with this number")
+        
+        raise TypeError("A section id must be str or int")
 
-    def count_rubric_occurences(structure: dict[dict[str:list]]) -> dict[str:int]:
-        """Counts how many times each rubric occurs within the entire paper"""
+    def __iter__(self):
+        return iter(self._sections)
 
-        pages: dict[list]  # keys are page numbers, values are rubrics lists
-        rubrics_count: dict[str: int] = {}  # result
+    def get_section(self, section_name: str = None) -> list[Section]:
+        if section_name is None:
+            return self._sections
+        return self[section_name]
 
-        for page in structure.values():
-            
-            rubrics: list
+    def get_pages(self) -> list[Page]:
+        pages = []
+        for section in self._sections: 
+            pages.extend(section.pages_in_section)
+        return pages
 
-            for rubrics in page.values():
+    def get_articles(self) -> list[Article]:
+        articles = []
+        for page in self.get_pages():
+            articles.extend(page.articles_on_page)
+        return articles
 
-                for rubric in rubrics:
-                    if rubric in rubrics_count:
-                        rubrics_count[rubric] += 1
-                    else:
-                        rubrics_count[rubric] = 1
+    def get_rubric_occurences(self):
+        articles: list[Article] = self.get_articles()
 
-        return rubrics_count
+        rubric_occurences: dict[str: set[Page]] = dict()
 
-    def load_issue_data_from_json(self) -> dict[str:dict[str:list]]:
-            with open(self.filename, "r", encoding="utf-8") as file:
-                issue_structure = load(file)
-            return issue_structure
+        for article in articles:
+            if article.rubric not in rubric_occurences:
+                rubric_occurences[article.rubric] = set()
+            rubric_occurences[article.rubric].add(article.parent_page)
 
-    def get_wandering_rubrics(rubric_occurences: dict):
-        """Returns only those rubrics that wander from page to page"""
+        return rubric_occurences
+
+    def get_wandering_rubrics(self) -> list[str]:
+        rubric_occurences = self.get_rubric_occurences()
         wandering_rubrics = []
-        for rubric, count in rubric_occurences.items():
-            if count > 1:
+        for rubric in rubric_occurences:
+            if len(rubric_occurences[rubric]) > 1:
                 wandering_rubrics.append(rubric)
-        print(f"Wandering_rubrics: {wandering_rubrics}")
         return wandering_rubrics
+
+    def without_wandering_rubrics(self) -> Issue:
+        # wandering_rubrics = self.get_wandering_rubrics()
+
+        # new_issue = Issue()
+
+        # for section in self._sections:
+        #     new_section = Section(
+        #         parent_issue=new_issue,
+
+        #         name=section.name,
+        #         pages_in_section=[]
+        #     )
+
+        #     for page in section:
+        #         new_page = Page(
+        #             parent_issue=new_issue,
+        #             parent_thematic_section=new_section,
+
+        #             page_number=page.page_number,
+        #             articles_on_page=[]
+        #         )
+
+        #         for article in page:
+        #             if article.rubric not in wandering_rubrics:
+        #                 new_article = Article(
+        #                     parent_issue=new_issue,
+        #                     parent_section=new_section,
+        #                     parent_page=new_page,
+
+        #                     rubric=article.rubric,
+        #                     volume=article.volume,
+        #                     heading=article.heading,
+        #                     author=article.author,
+        #                     is_column=article.is_column
+        #                 )
+
+
+        # return new_issue
+
+        new_issue = deepcopy(self)
+
+        return new_issue
+
+        
+        
+        
